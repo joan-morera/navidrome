@@ -24,6 +24,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     libtool \
     nasm \
     yasm \
+    zlib1g-dev \
     # Go & Node (Install dynamically)
     # Cleanup
     && rm -rf /var/lib/apt/lists/*
