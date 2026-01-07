@@ -1,0 +1,16 @@
+# Main Application Versions
+
+# Common
+qbittorrent-release-5.1.4
+qt-v6.10.1
+openssl-openssl-3.6.0
+mimalloc-v3.1.5
+distroless-sha256:b5f0eaa40ca8b4ffb054154f4a13b82ed07c22403ceddff2d9f940cb79382ada
+
+# Libtorrent V1
+libtorrent-v1-v1.2.20
+boost-v1-boost-1.86.0
+
+# Libtorrent V2
+libtorrent-v2-branch-f59119648138d08c00de86a06bfd4c68933c5fe0
+boost-v2-boost-1.90.0

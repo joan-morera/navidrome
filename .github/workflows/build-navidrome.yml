@@ -1,0 +1,196 @@
+name: Build Navidrome RPi4
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * *'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  check-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      rebuild: ${{ steps.check.outputs.rebuild }}
+      
+      # Versions
+      navidrome_ver: ${{ steps.get_navidrome.outputs.tag }}
+      ffmpeg_ver: ${{ steps.get_ffmpeg.outputs.tag }}
+      opus_ver: ${{ steps.get_opus.outputs.tag }}
+      lame_ver: ${{ steps.get_lame.outputs.tag }}
+      taglib_ver: ${{ steps.get_taglib.outputs.tag }}
+      distroless_digest: ${{ steps.get_distroless.outputs.digest }}
+      
+    steps:
+      - uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 1. Fetch Latest Versions
+      # -----------------------------------------------------------------------
+      
+      # Navidrome (Latest Release)
+      - name: Get latest Navidrome
+        id: get_navidrome
+        run: |
+          # Use GitHub API or raw tags. API is better for "latest release" logic.
+          TAG=$(curl -s https://api.github.com/repos/navidrome/navidrome/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # FFmpeg (Latest Release Tag nX.Y)
+      - name: Get latest FFmpeg
+        id: get_ffmpeg
+        run: |
+           TAG=$(git ls-remote --tags --sort='v:refname' https://git.ffmpeg.org/ffmpeg.git \
+             | grep "refs/tags/n" | grep -v "dev" | tail -n1 | sed 's/.*\///' | sed 's/^n//')
+           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # Opus (Latest Tag vX.Y)
+      - name: Get latest Opus
+        id: get_opus
+        run: |
+           TAG=$(git ls-remote --tags --sort='v:refname' https://github.com/xiph/opus.git \
+             | grep "refs/tags/v" | grep -v "rc\|beta\|alpha" | tail -n1 | sed 's/.*\///' | sed 's/^v//')
+           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # Lame (SourceForge is hard, use a fixed check or a mirror? GitHub mirror is stale. 
+      # We will check SourceForge RSS feed or just pinned for now, but let's try a clever grep on the download page if possible or just use last known stable)
+      # For now, let's stick to a robust check. Lame 3.100 is ancient (2017). 
+      # If it's ancient, checking for "latest" might be overkill, but let's assume we want to know if 3.101 ever drops.
+      # We'll just set it to 3.100 hardcoded in logic for now, or fetch from a reliable source.
+      # Let's use a "pinned" approach for Lame unless we find a good source.
+      # Actually, we can check the debian tracker or similar?
+      # Let's revert to a "Manual/Pinned" for Lame in this script effectively, or use a known mirror check.
+      - name: Get latest Lame
+        id: get_lame
+        run: |
+           # Hardcoding 3.100 as it's the de-facto standard for years.
+           echo "tag=3.100" >> $GITHUB_OUTPUT
+
+      # TagLib (Latest Tag vX.Y)
+      - name: Get latest TagLib
+        id: get_taglib
+        run: |
+           TAG=$(git ls-remote --tags --sort='v:refname' https://github.com/taglib/taglib.git \
+             | grep "refs/tags/v" | grep -v "beta\|rc" | tail -n1 | sed 's/.*\///' | sed 's/^v//')
+           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # Distroless
+      - name: Get Distroless Digest
+        id: get_distroless
+        run: |
+          DIGEST=$(docker manifest inspect gcr.io/distroless/cc-debian13:latest | jq -r '.manifests[0].digest')
+          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+
+      # -----------------------------------------------------------------------
+      # 2. Compare with Stored
+      # -----------------------------------------------------------------------
+      - name: Check for Changes
+        id: check
+        run: |
+            FILE="package-versions.txt"
+            CHANGED=false
+            
+            check_ver() {
+               NAME=$1
+               NEW=$2
+               OLD=$(grep "^${NAME}-" $FILE | sed "s/^${NAME}-//")
+               
+               if [ "$NEW" != "$OLD" ]; then
+                  echo "NEW $NAME: $NEW (was $OLD)"
+                  return 0
+               fi
+               return 1
+            }
+
+            if check_ver "navidrome" "${{ steps.get_navidrome.outputs.tag }}"; then CHANGED=true; fi
+            if check_ver "ffmpeg" "${{ steps.get_ffmpeg.outputs.tag }}"; then CHANGED=true; fi
+            if check_ver "opus" "${{ steps.get_opus.outputs.tag }}"; then CHANGED=true; fi
+            if check_ver "mp3lame" "${{ steps.get_lame.outputs.tag }}"; then CHANGED=true; fi
+            if check_ver "taglib" "${{ steps.get_taglib.outputs.tag }}"; then CHANGED=true; fi
+            if check_ver "distroless" "${{ steps.get_distroless.outputs.digest }}"; then CHANGED=true; fi
+
+            if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+                CHANGED=true
+            fi
+
+            echo "rebuild=$CHANGED" >> $GITHUB_OUTPUT
+
+  # ---------------------------------------------------------------------------
+  # Build (RPi4 Optimized)
+  # ---------------------------------------------------------------------------
+  build-rpi4:
+    needs: check-versions
+    if: needs.check-versions.outputs.rebuild == 'true'
+    # Native ARM64 Runner
+    runs-on: ubuntu-24.04-arm
+    env:
+      IMAGE_NAME: navidrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          # Tags: latest and rpi4
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/navidrome:latest
+            ghcr.io/${{ github.repository_owner }}/navidrome:rpi4
+          build-args: |
+             NAVIDROME_VERSION=${{ needs.check-versions.outputs.navidrome_ver }}
+             FFMPEG_VERSION=${{ needs.check-versions.outputs.ffmpeg_ver }}
+             OPUS_VERSION=${{ needs.check-versions.outputs.opus_ver }}
+             MP3LAME_VERSION=${{ needs.check-versions.outputs.lame_ver }}
+             TAGLIB_VERSION=${{ needs.check-versions.outputs.taglib_ver }}
+             # A72 Optimization
+             CFLAGS=-O3 -mcpu=cortex-a72 -fstack-protector-strong -D_FORTIFY_SOURCE=2
+             CXXFLAGS=-O3 -mcpu=cortex-a72 -fstack-protector-strong -D_FORTIFY_SOURCE=2
+          platforms: linux/arm64
+          provenance: false
+          cache-from: type=gha,scope=rpi4
+          cache-to: type=gha,mode=max,scope=rpi4
+
+  # ---------------------------------------------------------------------------
+  # Update Repo
+  # ---------------------------------------------------------------------------
+  update-repo:
+      needs: [check-versions, build-rpi4]
+      if: always() && needs.build-rpi4.result == 'success'
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: Update versions file
+          run: |
+             FILE="package-versions.txt"
+             
+             echo "# Navidrome Build Versions" > $FILE
+             echo "" >> $FILE
+             echo "# Main App" >> $FILE
+             echo "navidrome-${{ needs.check-versions.outputs.navidrome_ver }}" >> $FILE
+             echo "ffmpeg-${{ needs.check-versions.outputs.ffmpeg_ver }}" >> $FILE
+             echo "" >> $FILE
+             echo "# Libraries" >> $FILE
+             echo "opus-${{ needs.check-versions.outputs.opus_ver }}" >> $FILE
+             echo "mp3lame-${{ needs.check-versions.outputs.lame_ver }}" >> $FILE
+             echo "taglib-${{ needs.check-versions.outputs.taglib_ver }}" >> $FILE
+             echo "" >> $FILE
+             echo "# Base" >> $FILE
+             echo "distroless-${{ needs.check-versions.outputs.distroless_digest }}" >> $FILE
+             
+             git config --global user.name 'github-actions[bot]'
+             git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+             git add $FILE
+             if ! git diff --staged --quiet; then
+                git commit -m "build(navidrome): Update versions"
+                git push
+             fi

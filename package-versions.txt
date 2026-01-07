@@ -1,0 +1,13 @@
+# Navidrome Build Versions
+
+# Main App
+navidrome-0.0.0
+ffmpeg-0.0.0
+
+# Libraries
+opus-0.0.0
+mp3lame-0.0.0
+taglib-0.0.0
+
+# Base
+distroless-sha256:none

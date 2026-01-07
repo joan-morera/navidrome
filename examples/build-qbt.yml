@@ -1,0 +1,426 @@
+name: Build qBittorrent Multi-Arch
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  check-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      # Build Flags
+      rebuild_v1: ${{ steps.check.outputs.rebuild_v1 }}
+      rebuild_v2: ${{ steps.check.outputs.rebuild_v2 }}
+      
+      # Latest Versions
+      qbt_ver: ${{ steps.get_qbt.outputs.tag }}
+      libt_v1_ver: ${{ steps.get_libt_v1.outputs.tag }}
+      libt_v2_ref: ${{ steps.get_libt_v2.outputs.ref }}
+      qt_ver: ${{ steps.get_qt.outputs.tag }}
+      boost_v1_ver: ${{ steps.get_boost_v1.outputs.tag }}
+      boost_v2_ver: ${{ steps.get_boost_v2.outputs.tag }}
+      ssl_ver: ${{ steps.get_ssl.outputs.tag }}
+      mimalloc_ver: ${{ steps.get_mimalloc.outputs.tag }}
+      distroless_digest: ${{ steps.get_distroless.outputs.digest }}
+      
+    steps:
+      - uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 1. Fetch Latest Versions
+      # -----------------------------------------------------------------------
+      
+      # qBittorrent Release (Latest)
+      - name: Get latest qBittorrent
+        id: get_qbt
+        run: |
+          TAG=$(git ls-remote --tags --sort='v:refname' https://github.com/qbittorrent/qBittorrent.git \
+            | grep "refs/tags/release-" | grep -v "rc\|beta\|alpha" | grep -v "\^{}" | tail -n1 | sed 's/.*\///')
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # Libtorrent v1.2 (Stable Branch - TAGS)
+      - name: Get latest Libtorrent v1
+        id: get_libt_v1
+        run: |
+          TAG=$(git ls-remote --tags --sort='v:refname' https://github.com/arvidn/libtorrent.git \
+            | grep "refs/tags/v1.2" | grep -v "RC" | grep -v "\^{}" | tail -n1 | sed 's/.*\///')
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # Libtorrent V2 (Default Branch - HEAD COMMIT)
+      - name: Get latest Libtorrent v2 (Default Branch)
+        id: get_libt_v2
+        run: |
+          REF=$(git ls-remote https://github.com/arvidn/libtorrent.git HEAD | awk '{print $1}')
+          echo "ref=${REF}" >> $GITHUB_OUTPUT
+
+      # Qt 6 (Latest Release - Stable)
+      - name: Get latest Qt 6
+        id: get_qt
+        run: |
+           # Filter out betas/RCs because they often lack standard download URLs
+           TAG=$(git ls-remote --tags --sort='v:refname' https://code.qt.io/qt/qtbase.git \
+             | grep -E "refs/tags/v[0-9]+\." | grep -v "beta\|rc\|alpha" | grep -v "\^{}" | tail -n1 | sed 's/.*\///')
+           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # Boost V1 (Pinned - 1.86.x)
+      - name: Get Boost V1 (Pinned)
+        id: get_boost_v1
+        run: |
+          TAG=$(git ls-remote --tags --sort='v:refname' https://github.com/boostorg/boost.git \
+             | grep "refs/tags/boost-1.86" | grep -v "beta\|rc\|alpha" | grep -v "\^{}" | tail -n1 | sed 's/.*\///')
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # Boost V2 (Latest - Future Proof)
+      - name: Get Boost V2 (Latest)
+        id: get_boost_v2
+        run: |
+          TAG=$(git ls-remote --tags --sort='v:refname' https://github.com/boostorg/boost.git \
+             | grep -E "refs/tags/boost-[0-9]+" | grep -v "beta\|rc\|alpha" | grep -v "\^{}" | tail -n1 | sed 's/.*\///')
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # OpenSSL 3 (Latest - Aggressive)
+      - name: Get latest OpenSSL 3
+        id: get_ssl
+        run: |
+           # Use GitHub API for "Latest Release" (Ignores pre-releases unless marked latest)
+           TAG=$(curl -s https://api.github.com/repos/openssl/openssl/releases/latest | jq -r '.tag_name')
+           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # Mimalloc (Latest)
+      - name: Get latest Mimalloc
+        id: get_mimalloc
+        run: |
+           TAG=$(git ls-remote --tags --sort='v:refname' https://github.com/microsoft/mimalloc.git \
+             | grep "refs/tags/v" | grep -v "\^{}" | tail -n1 | sed 's/.*\///' | sed 's/\^{}//')
+           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      # Distroless Digest
+      - name: Get Distroless Digest
+        id: get_distroless
+        run: |
+          DIGEST=$(docker manifest inspect gcr.io/distroless/cc-debian13:latest | jq -r '.manifests[0].digest')
+          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+      
+      # -----------------------------------------------------------------------
+      # 2. Compare with Stored
+      # -----------------------------------------------------------------------
+      - name: Check for Changes
+        id: check
+        run: |
+            FILE="package-versions.txt"
+            
+            COMMON_CHANGED=false
+            V1_CHANGED=false
+            V2_CHANGED=false
+            
+            check_ver() {
+               NAME=$1
+               NEW=$2
+               if [[ "$NEW" == "${NAME}-"* ]]; then
+                 NEW_Clean=${NEW#${NAME}-}
+               else
+                 NEW_Clean=$NEW
+               fi
+               
+               OLD=$(grep "^${NAME}-" $FILE | sed "s/^${NAME}-//")
+
+               if [ "$NEW_Clean" != "$OLD" ]; then
+                  echo "NEW $NAME: $NEW_Clean (was $OLD)"
+                  return 0
+               fi
+               return 1
+            }
+
+            if check_ver "qbittorrent" "${{ steps.get_qbt.outputs.tag }}"; then COMMON_CHANGED=true; fi
+            if check_ver "qt" "${{ steps.get_qt.outputs.tag }}"; then COMMON_CHANGED=true; fi
+            if check_ver "openssl" "${{ steps.get_ssl.outputs.tag }}"; then COMMON_CHANGED=true; fi
+            if check_ver "mimalloc" "${{ steps.get_mimalloc.outputs.tag }}"; then COMMON_CHANGED=true; fi
+            if check_ver "distroless" "${{ steps.get_distroless.outputs.digest }}"; then COMMON_CHANGED=true; fi
+
+            # Specifics - V1
+            if check_ver "libtorrent-v1" "${{ steps.get_libt_v1.outputs.tag }}"; then V1_CHANGED=true; fi
+            if check_ver "boost-v1" "${{ steps.get_boost_v1.outputs.tag }}"; then V1_CHANGED=true; fi
+
+            # Specifics - V2
+            if check_ver "libtorrent-v2-branch" "${{ steps.get_libt_v2.outputs.ref }}"; then V2_CHANGED=true; fi
+            if check_ver "boost-v2" "${{ steps.get_boost_v2.outputs.tag }}"; then V2_CHANGED=true; fi
+
+            DO_V1=false
+            DO_V2=false
+
+            if [ "$COMMON_CHANGED" = true ] || [ "$V1_CHANGED" = true ]; then
+                DO_V1=true
+            fi
+            
+            if [ "$COMMON_CHANGED" = true ] || [ "$V2_CHANGED" = true ]; then
+                DO_V2=true
+            fi
+            
+            if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+                DO_V1=true
+                DO_V2=true
+            fi
+
+            echo "rebuild_v1=$DO_V1" >> $GITHUB_OUTPUT
+            echo "rebuild_v2=$DO_V2" >> $GITHUB_OUTPUT
+
+  # ---------------------------------------------------------------------------
+  # Build V1 -> qbittorrent (Boost V1)
+  # ---------------------------------------------------------------------------
+  build-v1:
+    needs: check-versions
+    if: needs.check-versions.outputs.rebuild_v1 == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            suffix: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            suffix: arm64
+    runs-on: ${{ matrix.runner }}
+    env:
+      IMAGE_NAME: qbittorrent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push V1 (${{ matrix.suffix }})
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ matrix.suffix }}
+          build-args: |
+             QBITTORRENT_VERSION=${{ needs.check-versions.outputs.qbt_ver }}
+             LIBTORRENT_VERSION=${{ needs.check-versions.outputs.libt_v1_ver }}
+             QT_VERSION=${{ needs.check-versions.outputs.qt_ver }}
+             BOOST_VERSION=${{ needs.check-versions.outputs.boost_v1_ver }}
+             OPENSSL_VERSION=${{ needs.check-versions.outputs.ssl_ver }}
+             MIMALLOC_VERSION=${{ needs.check-versions.outputs.mimalloc_ver }}
+             CFLAGS=-O3 -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security
+             CXXFLAGS=-O3 -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -flto
+             LDFLAGS=-Wl,-z,relro -Wl,-z,now -flto
+          platforms: ${{ matrix.platform }}
+          provenance: false
+          cache-from: type=gha,scope=v1-${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=v1-${{ matrix.suffix }}
+
+  build-v1-rpi4:
+    needs: check-versions
+    if: needs.check-versions.outputs.rebuild_v1 == 'true'
+    runs-on: ubuntu-24.04-arm
+    env:
+      IMAGE_NAME: qbittorrent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push V1 (RPi4)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:rpi4
+          build-args: |
+             QBITTORRENT_VERSION=${{ needs.check-versions.outputs.qbt_ver }}
+             LIBTORRENT_VERSION=${{ needs.check-versions.outputs.libt_v1_ver }}
+             QT_VERSION=${{ needs.check-versions.outputs.qt_ver }}
+             BOOST_VERSION=${{ needs.check-versions.outputs.boost_v1_ver }}
+             OPENSSL_VERSION=${{ needs.check-versions.outputs.ssl_ver }}
+             MIMALLOC_VERSION=${{ needs.check-versions.outputs.mimalloc_ver }}
+             CFLAGS=-O3 -mcpu=cortex-a72 -mtune=cortex-a72 -mno-outline-atomics -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security
+             CXXFLAGS=-O3 -mcpu=cortex-a72 -mtune=cortex-a72 -mno-outline-atomics -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -flto
+             LDFLAGS=-Wl,-z,relro -Wl,-z,now -flto
+          platforms: linux/arm64
+          provenance: false
+          cache-from: type=gha,scope=v1-rpi4
+          cache-to: type=gha,mode=max,scope=v1-rpi4
+
+  # ---------------------------------------------------------------------------
+  # Build V2 -> qbittorrent-lt2 (Boost V2)
+  # ---------------------------------------------------------------------------
+  build-v2:
+    needs: check-versions
+    if: needs.check-versions.outputs.rebuild_v2 == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            suffix: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            suffix: arm64
+    runs-on: ${{ matrix.runner }}
+    env:
+      IMAGE_NAME: qbittorrent-lt2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push V2 (${{ matrix.suffix }})
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ matrix.suffix }}
+          build-args: |
+             QBITTORRENT_VERSION=${{ needs.check-versions.outputs.qbt_ver }}
+             LIBTORRENT_VERSION=${{ needs.check-versions.outputs.libt_v2_ref }}
+             QT_VERSION=${{ needs.check-versions.outputs.qt_ver }}
+             BOOST_VERSION=${{ needs.check-versions.outputs.boost_v2_ver }}
+             OPENSSL_VERSION=${{ needs.check-versions.outputs.ssl_ver }}
+             MIMALLOC_VERSION=${{ needs.check-versions.outputs.mimalloc_ver }}
+             CFLAGS=-O3 -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security
+             CXXFLAGS=-O3 -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -flto
+             LDFLAGS=-Wl,-z,relro -Wl,-z,now -flto
+          platforms: ${{ matrix.platform }}
+          provenance: false
+          cache-from: type=gha,scope=v2-${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=v2-${{ matrix.suffix }}
+
+  build-v2-rpi4:
+    needs: check-versions
+    if: needs.check-versions.outputs.rebuild_v2 == 'true'
+    runs-on: ubuntu-24.04-arm
+    env:
+      IMAGE_NAME: qbittorrent-lt2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push V2 (RPi4)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:rpi4
+          build-args: |
+             QBITTORRENT_VERSION=${{ needs.check-versions.outputs.qbt_ver }}
+             LIBTORRENT_VERSION=${{ needs.check-versions.outputs.libt_v2_ref }}
+             QT_VERSION=${{ needs.check-versions.outputs.qt_ver }}
+             BOOST_VERSION=${{ needs.check-versions.outputs.boost_v2_ver }}
+             OPENSSL_VERSION=${{ needs.check-versions.outputs.ssl_ver }}
+             MIMALLOC_VERSION=${{ needs.check-versions.outputs.mimalloc_ver }}
+             CFLAGS=-O3 -mcpu=cortex-a72 -mtune=cortex-a72 -mno-outline-atomics -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security
+             CXXFLAGS=-O3 -mcpu=cortex-a72 -mtune=cortex-a72 -mno-outline-atomics -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security -flto
+             LDFLAGS=-Wl,-z,relro -Wl,-z,now -flto
+          platforms: linux/arm64
+          provenance: false
+          cache-from: type=gha,scope=v2-rpi4
+          cache-to: type=gha,mode=max,scope=v2-rpi4
+
+  # ---------------------------------------------------------------------------
+  # Manifest Merges (Create 'latest' for each package)
+  # ---------------------------------------------------------------------------
+  merge-v1:
+    needs: build-v1
+    if: always() && needs.build-v1.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create V1 Manifest (latest)
+        run: |
+           IMAGE="ghcr.io/${{ github.repository_owner }}/qbittorrent"
+           docker buildx imagetools create -t $IMAGE:latest \
+             $IMAGE:amd64 \
+             $IMAGE:arm64
+
+  merge-v2:
+    needs: build-v2
+    if: always() && needs.build-v2.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create V2 Manifest (latest)
+        run: |
+           IMAGE="ghcr.io/${{ github.repository_owner }}/qbittorrent-lt2"
+           docker buildx imagetools create -t $IMAGE:latest \
+             $IMAGE:amd64 \
+             $IMAGE:arm64
+
+  # ---------------------------------------------------------------------------
+  # Update Git Versions
+  # ---------------------------------------------------------------------------
+  update-repo:
+      needs: [check-versions, merge-v1, build-v1-rpi4, merge-v2, build-v2-rpi4]
+      if: always() && (needs.check-versions.outputs.rebuild_v1 == 'true' || needs.check-versions.outputs.rebuild_v2 == 'true')
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: Update versions file
+          run: |
+             FILE="package-versions.txt"
+             
+             # Grouped Output
+             echo "# Main Application Versions" > $FILE
+             echo "" >> $FILE
+             echo "# Common" >> $FILE
+             echo "qbittorrent-${{ needs.check-versions.outputs.qbt_ver }}" >> $FILE
+             echo "qt-${{ needs.check-versions.outputs.qt_ver }}" >> $FILE
+             echo "openssl-${{ needs.check-versions.outputs.ssl_ver }}" >> $FILE
+             echo "mimalloc-${{ needs.check-versions.outputs.mimalloc_ver }}" >> $FILE
+             echo "distroless-${{ needs.check-versions.outputs.distroless_digest }}" >> $FILE
+             echo "" >> $FILE
+             
+             echo "# Libtorrent V1" >> $FILE
+             echo "libtorrent-v1-${{ needs.check-versions.outputs.libt_v1_ver }}" >> $FILE
+             echo "boost-v1-${{ needs.check-versions.outputs.boost_v1_ver }}" >> $FILE
+             echo "" >> $FILE
+             
+             echo "# Libtorrent V2" >> $FILE
+             echo "libtorrent-v2-branch-${{ needs.check-versions.outputs.libt_v2_ref }}" >> $FILE
+             echo "boost-v2-${{ needs.check-versions.outputs.boost_v2_ver }}" >> $FILE
+             
+             git config --global user.name 'github-actions[bot]'
+             git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+             git add $FILE
+             if ! git diff --staged --quiet; then
+                git commit -m "build(qbt): Update versions"
+                git push
+             fi
