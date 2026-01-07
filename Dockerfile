@@ -24,11 +24,15 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     libtool \
     nasm \
     yasm \
-    # Go & Node (Install dynamically or via apt if recent enough, usually prefer manual for control)
-    nodejs \
-    npm \
+    # Go & Node (Install dynamically)
     # Cleanup
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 22 (LTS)
+RUN echo "[SETUP] Installing Node.js 22..." && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g npm@latest
 
 # Install Go (Latest Stable usually required for Navidrome)
 # We will use a fixed recent version or fetch via arg, but for now hardcode a known good generic or script?
@@ -118,15 +122,44 @@ RUN echo "[BUILD] Building FFmpeg ${FFMPEG_VERSION}..." && \
       --extra-libs="-lpthread -lm" \
       --bindir="/usr/local/bin" \
       --enable-static \
-      --enable-gpl \
-      --enable-version3 \
       --disable-shared \
       --disable-ffplay \
       --disable-ffprobe \
       --disable-doc \
       --disable-network \
+      # Minimal Audio Only
+      --disable-everything \
+      --enable-protocol=file \
       --enable-libmp3lame \
       --enable-libopus \
+      # Decoders (Common Audio)
+      --enable-decoder=aac \
+      --enable-decoder=libopus \
+      --enable-decoder=mp3 \
+      --enable-decoder=flac \
+      --enable-decoder=alac \
+      --enable-decoder=pcm_s16le \
+      --enable-decoder=wavpack \
+      # Encoders (Transcoding Targets)
+      --enable-encoder=aac \
+      --enable-encoder=libopus \
+      --enable-encoder=libmp3lame \
+      # Muxers/Demuxers
+      --enable-muxer=adts \
+      --enable-muxer=opus \
+      --enable-muxer=mp3 \
+      --enable-muxer=flac \
+      --enable-muxer=ipod \
+      --enable-demuxer=aac \
+      --enable-demuxer=ogg \
+      --enable-demuxer=mp3 \
+      --enable-demuxer=flac \
+      --enable-demuxer=wav \
+      --enable-demuxer=mov \
+      --enable-demuxer=m4a \
+      # Filters (Resampling is critical for transcoding)
+      --enable-filter=aresample \
+      # Hardware
       --enable-neon \
       --enable-asm \
       && \
