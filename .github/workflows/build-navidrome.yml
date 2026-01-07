@@ -51,7 +51,7 @@ jobs:
         id: get_opus
         run: |
            TAG=$(git ls-remote --tags --sort='v:refname' https://github.com/xiph/opus.git \
-             | grep "refs/tags/v" | grep -v "rc\|beta\|alpha" | grep -v "\^{}" | tail -n1 | sed 's/.*\///' | sed 's/^v//')
+             | grep "refs/tags/v" | grep -v "rc\|beta\|alpha" | grep -v "\^{}" | grep -v "v1.6" | tail -n1 | sed 's/.*\///' | sed 's/^v//')
            echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
       # Lame (SourceForge is hard, use a fixed check or a mirror? GitHub mirror is stale. 
