@@ -131,6 +131,7 @@ RUN echo "[BUILD] Building FFmpeg ${FFMPEG_VERSION}..." && \
       # Minimal Audio Only
       --disable-everything \
       --enable-protocol=file \
+      --enable-protocol=pipe \
       --enable-libmp3lame \
       --enable-libopus \
       # Decoders (Common Audio)
@@ -151,6 +152,7 @@ RUN echo "[BUILD] Building FFmpeg ${FFMPEG_VERSION}..." && \
       --enable-muxer=mp3 \
       --enable-muxer=flac \
       --enable-muxer=ipod \
+      --enable-muxer=null \
       --enable-demuxer=aac \
       --enable-demuxer=ogg \
       --enable-demuxer=mp3 \
@@ -158,8 +160,10 @@ RUN echo "[BUILD] Building FFmpeg ${FFMPEG_VERSION}..." && \
       --enable-demuxer=wav \
       --enable-demuxer=mov \
       --enable-demuxer=m4a \
+      --enable-demuxer=null \
       # Filters (Resampling is critical for transcoding)
       --enable-filter=aresample \
+      --enable-filter=anull \
       # Hardware
       --enable-neon \
       --enable-asm \
