@@ -28,9 +28,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     # Cleanup
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 22 (LTS)
-RUN echo "[SETUP] Installing Node.js 22..." && \
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+# Install Node.js 24 (LTS)
+RUN echo "[SETUP] Installing Node.js 24..." && \
+    curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g npm@latest
 
