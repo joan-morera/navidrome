@@ -38,11 +38,11 @@ jobs:
           if [ -z "$SHA" ]; then echo "Failed to get Navidrome SHA"; exit 1; fi
           echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
-      # FFmpeg (Master)
+      # FFmpeg (Master - GitHub Mirror)
       - name: Get latest FFmpeg (HEAD)
         id: get_ffmpeg
         run: |
-           SHA=$(git ls-remote https://git.ffmpeg.org/ffmpeg.git HEAD | awk '{print $1}')
+           SHA=$(git ls-remote https://github.com/FFmpeg/FFmpeg.git HEAD | awk '{print $1}')
            if [ -z "$SHA" ]; then echo "Failed to get FFmpeg SHA"; exit 1; fi
            echo "sha=${SHA}" >> $GITHUB_OUTPUT
 

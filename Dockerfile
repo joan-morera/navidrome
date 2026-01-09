@@ -116,10 +116,10 @@ RUN echo "[BUILD] Building TagLib (Commit: ${TAGLIB_VERSION})..." && \
     cd .. && rm -rf taglib-src
 
 # -----------------------------------------------------------------------------
-# 3. Build FFmpeg - From Git
+# 3. Build FFmpeg - From Git (GitHub Mirror)
 # -----------------------------------------------------------------------------
 RUN echo "[BUILD] Building FFmpeg (Commit: ${FFMPEG_VERSION})..." && \
-    git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg-src && \
+    git clone https://github.com/FFmpeg/FFmpeg.git ffmpeg-src && \
     cd ffmpeg-src && \
     git checkout ${FFMPEG_VERSION} && \
     ./configure \
