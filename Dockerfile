@@ -102,6 +102,7 @@ RUN echo "[BUILD] Building TagLib (Commit: ${TAGLIB_VERSION})..." && \
     git clone https://github.com/taglib/taglib.git taglib-src && \
     cd taglib-src && \
     git checkout ${TAGLIB_VERSION} && \
+    git submodule update --init --recursive && \
     cmake -B build \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_BUILD_TYPE=Release \
