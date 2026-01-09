@@ -1,5 +1,5 @@
 #
-# Navidrome (RPi4 Optimized)
+# Navidrome (RPi4 Optimized) - Bleeding Edge
 #
 # Stage 1: Builder
 FROM debian:trixie-slim AS builder
@@ -36,11 +36,17 @@ RUN echo "[SETUP] Installing Node.js 24..." && \
     npm install -g npm@latest
 
 # Install Go (Latest Stable usually required for Navidrome)
-# We will use a fixed recent version or fetch via arg, but for now hardcode a known good generic or script?
-# Better to use the requested arg or just fetch standard. 
-# Plan: Download Go in the Navidrome build step.
+RUN echo "[SETUP] Installing Go..." && \
+    GO_DL_ARCH="arm64" && \
+    # Fetch latest stable Go (or semi-hardcoded, update as needed)
+    GO_VER="1.23.4" && \
+    wget "https://go.dev/dl/go${GO_VER}.linux-${GO_DL_ARCH}.tar.gz" && \
+    rm -rf /usr/local/go && tar -C /usr/local -xzf go${GO_VER}.linux-${GO_DL_ARCH}.tar.gz && \
+    rm go${GO_VER}.linux-${GO_DL_ARCH}.tar.gz
 
-# Arguments (Versions)
+ENV PATH="/usr/local/go/bin:${PATH}"
+
+# Arguments (Versions = Commit SHAs)
 ARG NAVIDROME_VERSION
 ARG FFMPEG_VERSION
 ARG OPUS_VERSION
@@ -59,11 +65,11 @@ WORKDIR /build
 # 2. Build Dependencies (Audio Codecs)
 # -----------------------------------------------------------------------------
 
-# LAME (MP3)
-RUN echo "[BUILD] Building Lame ${MP3LAME_VERSION}..." && \
-    wget "https://downloads.sourceforge.net/project/lame/lame/${MP3LAME_VERSION}/lame-${MP3LAME_VERSION}.tar.gz" -O lame.tar.gz && \
-    tar xzf lame.tar.gz && \
-    cd lame-${MP3LAME_VERSION} && \
+# LAME (MP3) - From SourceForge Git
+RUN echo "[BUILD] Building Lame (Commit: ${MP3LAME_VERSION})..." && \
+    git clone https://git.code.sf.net/p/lame/lame lame-src && \
+    cd lame-src && \
+    git checkout ${MP3LAME_VERSION} && \
     ./configure \
       --prefix=/usr/local \
       --enable-static \
@@ -72,13 +78,14 @@ RUN echo "[BUILD] Building Lame ${MP3LAME_VERSION}..." && \
       && \
     make -j$(nproc) "CFLAGS=${CFLAGS}" && \
     make install && \
-    cd .. && rm -rf lame*
+    cd .. && rm -rf lame-src
 
-# Opus
-RUN echo "[BUILD] Building Opus ${OPUS_VERSION}..." && \
-    wget "https://github.com/xiph/opus/releases/download/v${OPUS_VERSION}/opus-${OPUS_VERSION}.tar.gz" -O opus.tar.gz && \
-    tar xzf opus.tar.gz && \
-    cd opus-${OPUS_VERSION} && \
+# Opus - From GitHub
+RUN echo "[BUILD] Building Opus (Commit: ${OPUS_VERSION})..." && \
+    git clone https://github.com/xiph/opus.git opus-src && \
+    cd opus-src && \
+    git checkout ${OPUS_VERSION} && \
+    ./autogen.sh && \
     ./configure \
       --prefix=/usr/local \
       --enable-static \
@@ -88,13 +95,13 @@ RUN echo "[BUILD] Building Opus ${OPUS_VERSION}..." && \
       && \
     make -j$(nproc) "CFLAGS=${CFLAGS}" && \
     make install && \
-    cd .. && rm -rf opus*
+    cd .. && rm -rf opus-src
 
-# TagLib (Needed for Navidrome)
-RUN echo "[BUILD] Building TagLib ${TAGLIB_VERSION}..." && \
-    wget "https://taglib.github.io/releases/taglib-${TAGLIB_VERSION}.tar.gz" -O taglib.tar.gz && \
-    tar xzf taglib.tar.gz && \
-    cd taglib-${TAGLIB_VERSION} && \
+# TagLib (Needed for Navidrome) - From GitHub
+RUN echo "[BUILD] Building TagLib (Commit: ${TAGLIB_VERSION})..." && \
+    git clone https://github.com/taglib/taglib.git taglib-src && \
+    cd taglib-src && \
+    git checkout ${TAGLIB_VERSION} && \
     cmake -B build \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_BUILD_TYPE=Release \
@@ -105,16 +112,15 @@ RUN echo "[BUILD] Building TagLib ${TAGLIB_VERSION}..." && \
       && \
     cmake --build build --parallel $(nproc) && \
     cmake --install build && \
-    cd .. && rm -rf taglib*
+    cd .. && rm -rf taglib-src
 
 # -----------------------------------------------------------------------------
-# 3. Build FFmpeg
+# 3. Build FFmpeg - From Git
 # -----------------------------------------------------------------------------
-RUN echo "[BUILD] Building FFmpeg ${FFMPEG_VERSION}..." && \
-    # FFmpeg releases are usually tarballs. Only snapshot is git. We'll assume tarball for named version.
-    wget "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" -O ffmpeg.tar.xz && \
-    tar xf ffmpeg.tar.xz && \
-    cd ffmpeg-${FFMPEG_VERSION} && \
+RUN echo "[BUILD] Building FFmpeg (Commit: ${FFMPEG_VERSION})..." && \
+    git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg-src && \
+    cd ffmpeg-src && \
+    git checkout ${FFMPEG_VERSION} && \
     ./configure \
       --prefix=/usr/local \
       --pkg-config-flags="--static" \
@@ -170,25 +176,15 @@ RUN echo "[BUILD] Building FFmpeg ${FFMPEG_VERSION}..." && \
       && \
     make -j$(nproc) && \
     make install && \
-    cd .. && rm -rf ffmpeg*
+    cd .. && rm -rf ffmpeg-src
 
 # -----------------------------------------------------------------------------
-# 4. Build Navidrome
+# 4. Build Navidrome - From GitHub (HEAD)
 # -----------------------------------------------------------------------------
-# Install Go
-RUN echo "[SETUP] Installing Go..." && \
-    GO_DL_ARCH="arm64" && \
-    # Fetch latest stable Go (or semi-hardcoded, update as needed)
-    GO_VER="1.23.4" && \
-    wget "https://go.dev/dl/go${GO_VER}.linux-${GO_DL_ARCH}.tar.gz" && \
-    rm -rf /usr/local/go && tar -C /usr/local -xzf go${GO_VER}.linux-${GO_DL_ARCH}.tar.gz && \
-    rm go${GO_VER}.linux-${GO_DL_ARCH}.tar.gz
-
-ENV PATH="/usr/local/go/bin:${PATH}"
-
-RUN echo "[BUILD] Building Navidrome ${NAVIDROME_VERSION}..." && \
-    git clone --depth 1 --branch "v${NAVIDROME_VERSION}" https://github.com/navidrome/navidrome.git && \
-    cd navidrome && \
+RUN echo "[BUILD] Building Navidrome (Commit: ${NAVIDROME_VERSION})..." && \
+    git clone https://github.com/navidrome/navidrome.git navidrome-src && \
+    cd navidrome-src && \
+    git checkout ${NAVIDROME_VERSION} && \
     # Frontend
     make setup && \
     make buildjs && \
@@ -200,9 +196,9 @@ RUN echo "[BUILD] Building Navidrome ${NAVIDROME_VERSION}..." && \
     export CGO_ENABLED=1 && \
     export CGO_LDFLAGS="-L/usr/local/lib -ltag -lz -lstdc++ -lm" && \
     export CGO_CFLAGS="-I/usr/local/include/taglib -I/usr/local/include" && \
-    go build -tags=netgo -ldflags "-extldflags '-static' -X github.com/navidrome/navidrome/resources.Commit=$(git rev-parse HEAD) -X github.com/navidrome/navidrome/resources.Tag=v${NAVIDROME_VERSION}" -o navidrome . && \
+    go build -tags=netgo -ldflags "-extldflags '-static' -X github.com/navidrome/navidrome/resources.Commit=$(git rev-parse HEAD) -X github.com/navidrome/navidrome/resources.Tag=0.0.0-HEAD" -o navidrome . && \
     cp navidrome /usr/local/bin/navidrome && \
-    cd .. && rm -rf navidrome
+    cd .. && rm -rf navidrome-src
 
 # -----------------------------------------------------------------------------
 # 5. User Setup

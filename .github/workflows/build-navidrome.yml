@@ -3,7 +3,7 @@ name: Build Navidrome RPi4
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '0 4 * * 0'
 
 permissions:
   contents: write
@@ -15,66 +15,56 @@ jobs:
     outputs:
       rebuild: ${{ steps.check.outputs.rebuild }}
       
-      # Versions
-      navidrome_ver: ${{ steps.get_navidrome.outputs.tag }}
-      ffmpeg_ver: ${{ steps.get_ffmpeg.outputs.tag }}
-      opus_ver: ${{ steps.get_opus.outputs.tag }}
-      lame_ver: ${{ steps.get_lame.outputs.tag }}
-      taglib_ver: ${{ steps.get_taglib.outputs.tag }}
+      # Versions (Commit SHAs)
+      navidrome_ver: ${{ steps.get_navidrome.outputs.sha }}
+      ffmpeg_ver: ${{ steps.get_ffmpeg.outputs.sha }}
+      opus_ver: ${{ steps.get_opus.outputs.sha }}
+      lame_ver: ${{ steps.get_lame.outputs.sha }}
+      taglib_ver: ${{ steps.get_taglib.outputs.sha }}
       distroless_digest: ${{ steps.get_distroless.outputs.digest }}
       
     steps:
       - uses: actions/checkout@v4
 
       # -----------------------------------------------------------------------
-      # 1. Fetch Latest Versions
+      # 1. Fetch Latest Commits (Bleeding Edge)
       # -----------------------------------------------------------------------
       
-      # Navidrome (Latest Release)
-      - name: Get latest Navidrome
+      # Navidrome (Master/Main)
+      - name: Get latest Navidrome (HEAD)
         id: get_navidrome
         run: |
-          # Use GitHub API or raw tags. API is better for "latest release" logic.
-          TAG=$(curl -s https://api.github.com/repos/navidrome/navidrome/releases/latest | jq -r '.tag_name' | sed 's/^v//')
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          SHA=$(git ls-remote https://github.com/navidrome/navidrome.git HEAD | awk '{print $1}')
+          echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
-      # FFmpeg (Latest Release Tag nX.Y)
-      - name: Get latest FFmpeg
+      # FFmpeg (Master)
+      - name: Get latest FFmpeg (HEAD)
         id: get_ffmpeg
         run: |
-           TAG=$(git ls-remote --tags --sort='v:refname' https://git.ffmpeg.org/ffmpeg.git \
-             | grep "refs/tags/n" | grep -v "dev" | grep -v "\^{}" | tail -n1 | sed 's/.*\///' | sed 's/^n//')
-           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+           SHA=$(git ls-remote https://git.ffmpeg.org/ffmpeg.git HEAD | awk '{print $1}')
+           echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
-      # Opus (Latest Tag vX.Y)
-      - name: Get latest Opus
+      # Opus (Master)
+      - name: Get latest Opus (HEAD)
         id: get_opus
         run: |
-           TAG=$(git ls-remote --tags --sort='v:refname' https://github.com/xiph/opus.git \
-             | grep "refs/tags/v" | grep -v "rc\|beta\|alpha" | grep -v "\^{}" | grep -v "v1.6" | tail -n1 | sed 's/.*\///' | sed 's/^v//')
-           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+           SHA=$(git ls-remote https://github.com/xiph/opus.git HEAD | awk '{print $1}')
+           echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
-      # Lame (SourceForge is hard, use a fixed check or a mirror? GitHub mirror is stale. 
-      # We will check SourceForge RSS feed or just pinned for now, but let's try a clever grep on the download page if possible or just use last known stable)
-      # For now, let's stick to a robust check. Lame 3.100 is ancient (2017). 
-      # If it's ancient, checking for "latest" might be overkill, but let's assume we want to know if 3.101 ever drops.
-      # We'll just set it to 3.100 hardcoded in logic for now, or fetch from a reliable source.
-      # Let's use a "pinned" approach for Lame unless we find a good source.
-      # Actually, we can check the debian tracker or similar?
-      # Let's revert to a "Manual/Pinned" for Lame in this script effectively, or use a known mirror check.
-      - name: Get latest Lame
+      # Lame (Master - SourceForge Git)
+      - name: Get latest Lame (HEAD)
         id: get_lame
         run: |
-           # Hardcoding 3.100 as it's the de-facto standard for years.
-           echo "tag=3.100" >> $GITHUB_OUTPUT
+           # Using Official SourceForge Git Mirror/Repo
+           SHA=$(git ls-remote https://git.code.sf.net/p/lame/lame HEAD | awk '{print $1}')
+           echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
-      # TagLib (Latest Tag vX.Y)
-      - name: Get latest TagLib
+      # TagLib (Master)
+      - name: Get latest TagLib (HEAD)
         id: get_taglib
         run: |
-           TAG=$(git ls-remote --tags --sort='v:refname' https://github.com/taglib/taglib.git \
-             | grep "refs/tags/v" | grep -v "beta\|rc" | grep -v "\^{}" | tail -n1 | sed 's/.*\///' | sed 's/^v//')
-           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+           SHA=$(git ls-remote https://github.com/taglib/taglib.git HEAD | awk '{print $1}')
+           echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
       # Distroless
       - name: Get Distroless Digest
@@ -104,11 +94,11 @@ jobs:
                return 1
             }
 
-            if check_ver "navidrome" "${{ steps.get_navidrome.outputs.tag }}"; then CHANGED=true; fi
-            if check_ver "ffmpeg" "${{ steps.get_ffmpeg.outputs.tag }}"; then CHANGED=true; fi
-            if check_ver "opus" "${{ steps.get_opus.outputs.tag }}"; then CHANGED=true; fi
-            if check_ver "mp3lame" "${{ steps.get_lame.outputs.tag }}"; then CHANGED=true; fi
-            if check_ver "taglib" "${{ steps.get_taglib.outputs.tag }}"; then CHANGED=true; fi
+            if check_ver "navidrome" "${{ steps.get_navidrome.outputs.sha }}"; then CHANGED=true; fi
+            if check_ver "ffmpeg" "${{ steps.get_ffmpeg.outputs.sha }}"; then CHANGED=true; fi
+            if check_ver "opus" "${{ steps.get_opus.outputs.sha }}"; then CHANGED=true; fi
+            if check_ver "mp3lame" "${{ steps.get_lame.outputs.sha }}"; then CHANGED=true; fi
+            if check_ver "taglib" "${{ steps.get_taglib.outputs.sha }}"; then CHANGED=true; fi
             if check_ver "distroless" "${{ steps.get_distroless.outputs.digest }}"; then CHANGED=true; fi
 
             if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
