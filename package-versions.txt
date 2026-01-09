@@ -1,13 +1,13 @@
-# Navidrome Build Versions (Commits)
+# Navidrome Build Versions
 
 # Main App
-navidrome-0000000
-ffmpeg-0000000
+navidrome-5c3568f7587d01432a659551c12bf1643af1804d
+ffmpeg-272c273d30f737632e6630458ed36a0bdbfbc3fc
 
 # Libraries
-opus-0000000
-mp3lame-0000000
-taglib-0000000
+opus-c13d23f32b75903e7f3041b77cd5abd2754230e1
+mp3lame-9a5b35c430a2e6d150d65a96c7d7acdd64962a8f
+taglib-9c042984d26af605a6fd1dac7f12bda05219fee7
 
 # Base
-distroless-sha256:none
+distroless-sha256:b5f0eaa40ca8b4ffb054154f4a13b82ed07c22403ceddff2d9f940cb79382ada
