@@ -7,18 +7,21 @@ It is built from source, including a custom static **FFmpeg** build, and runs on
 ## Features & Improvements
 - **Architecture**: **ARM64** only, specifically optimized for **Raspberry Pi 4** (`-mcpu=cortex-a72`).
 - **Base Image**: `gcr.io/distroless/cc-debian13` (Minimal, Secure, No Shell).
-- **FFmpeg**: Built statically with `NEON` optimizations enabled.
-  - **Codecs**: `libopus`, `libmp3lame` included.
-- **Navidrome**: Built from source matching the latest tagged release.
+- **FFmpeg**: **Audio-Only** Minimal Build. Statically compiled with `NEON` optimizations.
+  - **Included Codecs**: `AAC`, `Opus` (`libopus`), `MP3` (`libmp3lame`), `FLAC`, `ALAC`.
+  - **Bloat Removed**: Video support, network protocols (except pipe/file), and unused filters are disabled to keep the image small and efficient.
+- **Navidrome**: Built from the latest available Git commit (**Bleeding Edge**).
 
 ## Build Policy
-The GitHub Actions workflow runs daily to check for:
-1. New **Navidrome** releases.
-2. New **FFmpeg** tags.
-3. Updates to **Distroless** base image.
-4. Updates to **libs** (Opus, TagLib, etc).
+The GitHub Actions workflow runs **Weekly (Sundays)** to check for updates.
+Everything is built from the **latest Git commit (HEAD)** of the respective repositories:
+1. **Navidrome** (GitHub)
+2. **FFmpeg** (GitHub Mirror)
+3. **Opus** (Xiph GitHub)
+4. **Lame** (Debian Salsa)
+5. **TagLib** (GitHub)
 
-If any change is detected, the image is automatically rebuilt and published to GHCR.
+If any new link in the chain has a new commit, a fresh image is rebuilt and published to GHCR.
 
 ## Usage
 The container is configured to use `/data` for configuration and `/music` for your library.
