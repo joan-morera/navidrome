@@ -35,6 +35,7 @@ jobs:
         id: get_navidrome
         run: |
           SHA=$(git ls-remote https://github.com/navidrome/navidrome.git HEAD | awk '{print $1}')
+          if [ -z "$SHA" ]; then echo "Failed to get Navidrome SHA"; exit 1; fi
           echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
       # FFmpeg (Master)
@@ -42,6 +43,7 @@ jobs:
         id: get_ffmpeg
         run: |
            SHA=$(git ls-remote https://git.ffmpeg.org/ffmpeg.git HEAD | awk '{print $1}')
+           if [ -z "$SHA" ]; then echo "Failed to get FFmpeg SHA"; exit 1; fi
            echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
       # Opus (Master)
@@ -49,14 +51,16 @@ jobs:
         id: get_opus
         run: |
            SHA=$(git ls-remote https://github.com/xiph/opus.git HEAD | awk '{print $1}')
+           if [ -z "$SHA" ]; then echo "Failed to get Opus SHA"; exit 1; fi
            echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
-      # Lame (Master - SourceForge Git)
+      # Lame (Master - GitHub Mirror)
       - name: Get latest Lame (HEAD)
         id: get_lame
         run: |
-           # Using Official SourceForge Git Mirror/Repo
-           SHA=$(git ls-remote https://git.code.sf.net/p/lame/lame HEAD | awk '{print $1}')
+           # Using rbrito/lame GitHub mirror as SourceForge is flaky/invalid for git
+           SHA=$(git ls-remote https://github.com/rbrito/lame.git HEAD | awk '{print $1}')
+           if [ -z "$SHA" ]; then echo "Failed to get Lame SHA"; exit 1; fi
            echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
       # TagLib (Master)
@@ -64,6 +68,7 @@ jobs:
         id: get_taglib
         run: |
            SHA=$(git ls-remote https://github.com/taglib/taglib.git HEAD | awk '{print $1}')
+           if [ -z "$SHA" ]; then echo "Failed to get TagLib SHA"; exit 1; fi
            echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
       # Distroless

@@ -65,9 +65,9 @@ WORKDIR /build
 # 2. Build Dependencies (Audio Codecs)
 # -----------------------------------------------------------------------------
 
-# LAME (MP3) - From SourceForge Git
+# LAME (MP3) - From GitHub (rbrito - Debian Maintainer Mirror)
 RUN echo "[BUILD] Building Lame (Commit: ${MP3LAME_VERSION})..." && \
-    git clone https://git.code.sf.net/p/lame/lame lame-src && \
+    git clone https://github.com/rbrito/lame.git lame-src && \
     cd lame-src && \
     git checkout ${MP3LAME_VERSION} && \
     ./configure \
