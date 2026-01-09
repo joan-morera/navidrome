@@ -54,12 +54,12 @@ jobs:
            if [ -z "$SHA" ]; then echo "Failed to get Opus SHA"; exit 1; fi
            echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
-      # Lame (Master - GitHub Mirror)
+      # Lame (Master - Debian Salsa)
       - name: Get latest Lame (HEAD)
         id: get_lame
         run: |
-           # Using rbrito/lame GitHub mirror as SourceForge is flaky/invalid for git
-           SHA=$(git ls-remote https://github.com/rbrito/lame.git HEAD | awk '{print $1}')
+           # Using Debian Salsa Multimedia Team repo
+           SHA=$(git ls-remote https://salsa.debian.org/multimedia-team/lame.git HEAD | awk '{print $1}')
            if [ -z "$SHA" ]; then echo "Failed to get Lame SHA"; exit 1; fi
            echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
