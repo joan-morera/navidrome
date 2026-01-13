@@ -15,7 +15,7 @@ It is built from source, including a custom static **FFmpeg** build, and runs on
 - **Navidrome**: Built from the latest available Git commit (**Bleeding Edge**).
 
 ## Build Policy
-The GitHub Actions workflow runs **Weekly (Sundays)** to check for updates.
+The GitHub Actions workflow runs **Weekly (Sundays at 04:00 UTC)** to check for updates.
 Everything is built from the **latest Git commit (HEAD)** of the respective repositories:
 1. **Navidrome** (GitHub)
 2. **FFmpeg** (GitHub Mirror)
