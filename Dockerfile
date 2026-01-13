@@ -37,6 +37,9 @@ ARG CFLAGS="-O3 -mcpu=cortex-a72 -fstack-protector-strong -D_FORTIFY_SOURCE=2"
 ARG CXXFLAGS="-O3 -mcpu=cortex-a72 -fstack-protector-strong -D_FORTIFY_SOURCE=2"
 ARG LDFLAGS="-Wl,-z,relro -Wl,-z,now"
 
+# PKG_CONFIG_PATH for /usr/local (libs built from source)
+ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:${PKG_CONFIG_PATH}"
+
 # Working Directory
 WORKDIR /build
 
