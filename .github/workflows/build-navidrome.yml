@@ -21,7 +21,6 @@ jobs:
       opus_ver: ${{ steps.get_opus.outputs.sha }}
       lame_ver: ${{ steps.get_lame.outputs.sha }}
       taglib_ver: ${{ steps.get_taglib.outputs.sha }}
-      distroless_digest: ${{ steps.get_distroless.outputs.digest }}
       
     steps:
       - uses: actions/checkout@v4
@@ -71,12 +70,6 @@ jobs:
            if [ -z "$SHA" ]; then echo "Failed to get TagLib SHA"; exit 1; fi
            echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
-      # Distroless
-      - name: Get Distroless Digest
-        id: get_distroless
-        run: |
-          DIGEST=$(docker manifest inspect gcr.io/distroless/cc-debian13:latest | jq -r '.manifests[0].digest')
-          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
       # -----------------------------------------------------------------------
       # 2. Compare with Stored
@@ -104,7 +97,6 @@ jobs:
             if check_ver "opus" "${{ steps.get_opus.outputs.sha }}"; then CHANGED=true; fi
             if check_ver "mp3lame" "${{ steps.get_lame.outputs.sha }}"; then CHANGED=true; fi
             if check_ver "taglib" "${{ steps.get_taglib.outputs.sha }}"; then CHANGED=true; fi
-            if check_ver "distroless" "${{ steps.get_distroless.outputs.digest }}"; then CHANGED=true; fi
 
             if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
                 CHANGED=true
@@ -178,9 +170,6 @@ jobs:
              echo "opus-${{ needs.check-versions.outputs.opus_ver }}" >> $FILE
              echo "mp3lame-${{ needs.check-versions.outputs.lame_ver }}" >> $FILE
              echo "taglib-${{ needs.check-versions.outputs.taglib_ver }}" >> $FILE
-             echo "" >> $FILE
-             echo "# Base" >> $FILE
-             echo "distroless-${{ needs.check-versions.outputs.distroless_digest }}" >> $FILE
              
              git config --global user.name 'github-actions[bot]'
              git config --global user.email 'github-actions[bot]@users.noreply.github.com'

@@ -2,49 +2,28 @@
 # Navidrome (RPi4 Optimized) - Bleeding Edge
 #
 # Stage 1: Builder
-FROM debian:trixie-slim AS builder
+FROM ogarcia/archlinux:latest AS builder
 
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
-ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. Install System Dependencies
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
-    build-essential \
-    pkg-config \
+# 1. Install System Dependencies (Arch Linux)
+# base-devel: includes gcc, make, etc.
+# go, nodejs, npm: Latest versions are in Arch repos
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm \
+    base-devel \
     git \
     wget \
     curl \
-    ca-certificates \
-    python3 \
-    # Build Tools
     cmake \
-    autoconf \
-    automake \
-    libtool \
     nasm \
     yasm \
-    zlib1g-dev \
-    # Go & Node (Install dynamically)
-    # Cleanup
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js 24 (LTS)
-RUN echo "[SETUP] Installing Node.js 24..." && \
-    curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g npm@latest
-
-# Install Go (Latest Stable usually required for Navidrome)
-RUN echo "[SETUP] Installing Go..." && \
-    GO_DL_ARCH="arm64" && \
-    # Fetch latest stable Go (or semi-hardcoded, update as needed)
-    GO_VER="1.23.4" && \
-    wget "https://go.dev/dl/go${GO_VER}.linux-${GO_DL_ARCH}.tar.gz" && \
-    rm -rf /usr/local/go && tar -C /usr/local -xzf go${GO_VER}.linux-${GO_DL_ARCH}.tar.gz && \
-    rm go${GO_VER}.linux-${GO_DL_ARCH}.tar.gz
-
-ENV PATH="/usr/local/go/bin:${PATH}"
+    go \
+    nodejs \
+    npm \
+    python \
+    tzdata
 
 # Arguments (Versions = Commit SHAs)
 ARG NAVIDROME_VERSION
@@ -190,10 +169,6 @@ RUN echo "[BUILD] Building Navidrome (Commit: ${NAVIDROME_VERSION})..." && \
     make setup && \
     make buildjs && \
     # Backend
-    # Navidrome uses a specific build script/Makefile usually, but we want explicit control for static link
-    # Check if they have a 'build' target. Usually: 'go build'
-    # We must link taglib static. pkg-config is handled by CGO usually.
-    # We force static link.
     export CGO_ENABLED=1 && \
     export CGO_LDFLAGS="-L/usr/local/lib -ltag -lz -lstdc++ -lm" && \
     export CGO_CFLAGS="-I/usr/local/include/taglib -I/usr/local/include" && \
@@ -204,21 +179,27 @@ RUN echo "[BUILD] Building Navidrome (Commit: ${NAVIDROME_VERSION})..." && \
 # -----------------------------------------------------------------------------
 # 5. User Setup
 # -----------------------------------------------------------------------------
-RUN useradd -u 1000 -s /bin/false -d /data navidrome && \
+RUN useradd -u 1000 -U -s /bin/false -d /data navidrome && \
     mkdir -p /data /music && \
     chown -R navidrome:navidrome /data /music
 
 # -----------------------------------------------------------------------------
-# Stage 2: Final (Distroless)
+# Stage 2: Final (Scratch)
 # -----------------------------------------------------------------------------
-FROM gcr.io/distroless/cc-debian13
+FROM scratch
 LABEL maintainer="JoanMorera"
 
-# Copy user
+# 1. SSL Certs (Critical for HTTPS)
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# 2. Timezone Data
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+
+# 3. Users/Groups
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
 
-# Copy Binaries
+# 4. Binaries
 COPY --from=builder --chown=navidrome:navidrome /usr/local/bin/navidrome /navidrome
 COPY --from=builder --chown=navidrome:navidrome /usr/local/bin/ffmpeg /usr/bin/ffmpeg
 
