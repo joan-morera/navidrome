@@ -180,11 +180,26 @@ RUN echo "[BUILD] Building Navidrome (Commit: ${NAVIDROME_VERSION})..." && \
     cd .. && rm -rf navidrome-src
 
 # -----------------------------------------------------------------------------
-# 5. User Setup
+# 5. User Setup & Rootfs Preparation (Single Layer Optimization)
 # -----------------------------------------------------------------------------
-RUN useradd -u 1000 -U -s /bin/false -d /data navidrome && \
-    mkdir -p /data /music && \
-    chown -R navidrome:navidrome /data /music
+RUN mkdir -p /rootfs/etc/ssl/certs \
+             /rootfs/usr/share/zoneinfo \
+             /rootfs/usr/local/bin \
+             /rootfs/usr/bin \
+             /rootfs/data \
+             /rootfs/music && \
+    # Users
+    useradd -u 1000 -U -s /bin/false -d /data navidrome && \
+    grep navidrome /etc/passwd > /rootfs/etc/passwd && \
+    grep navidrome /etc/group > /rootfs/etc/group && \
+    # Certs & Timezone
+    cp /etc/ssl/certs/ca-certificates.crt /rootfs/etc/ssl/certs/ && \
+    cp -r /usr/share/zoneinfo/* /rootfs/usr/share/zoneinfo/ && \
+    # Binaries
+    cp navidrome /rootfs/usr/local/bin/navidrome && \
+    cp /usr/local/bin/ffmpeg /rootfs/usr/bin/ffmpeg && \
+    # Permissions
+    chown -R 1000:1000 /rootfs/data /rootfs/music
 
 # -----------------------------------------------------------------------------
 # Stage 2: Final (Scratch)
@@ -192,19 +207,8 @@ RUN useradd -u 1000 -U -s /bin/false -d /data navidrome && \
 FROM scratch
 LABEL maintainer="JoanMorera"
 
-# 1. SSL Certs (Critical for HTTPS)
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-
-# 2. Timezone Data
-COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
-
-# 3. Users/Groups
-COPY --from=builder /etc/passwd /etc/passwd
-COPY --from=builder /etc/group /etc/group
-
-# 4. Binaries
-COPY --from=builder --chown=navidrome:navidrome /usr/local/bin/navidrome /navidrome
-COPY --from=builder --chown=navidrome:navidrome /usr/local/bin/ffmpeg /usr/bin/ffmpeg
+# Copy everything in one layer
+COPY --from=builder /rootfs /
 
 # Configuration
 ENV ND_MUSICFOLDER="/music" \

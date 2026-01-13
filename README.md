@@ -6,7 +6,9 @@ It is built from source, including a custom static **FFmpeg** build, and runs on
 
 ## Features & Improvements
 - **Architecture**: **ARM64** only, specifically optimized for **Raspberry Pi 4** (`-mcpu=cortex-a72`).
-- **Base Image**: `gcr.io/distroless/cc-debian13` (Minimal, Secure, No Shell).
+- **Base Image**: `scratch` (Empty).
+  - The final image is a **single layer** containing only the static binaries and necessary system files (certs, timezone).
+  - Built using **Arch Linux** to leverage the latest compiler optimizations and libraries.
 - **FFmpeg**: **Audio-Only** Minimal Build. Statically compiled with `NEON` optimizations.
   - **Included Codecs**: `AAC`, `Opus` (`libopus`), `MP3` (`libmp3lame`), `FLAC`, `ALAC`.
   - **Bloat Removed**: Video support, network protocols (except pipe/file), and unused filters are disabled to keep the image small and efficient.
