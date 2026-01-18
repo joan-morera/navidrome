@@ -197,7 +197,7 @@ RUN mkdir -p /rootfs/etc/ssl/certs \
     cp /etc/ssl/certs/ca-certificates.crt /rootfs/etc/ssl/certs/ && \
     cp -r /usr/share/zoneinfo/* /rootfs/usr/share/zoneinfo/ && \
     # Binaries
-    cp navidrome /rootfs/usr/local/bin/navidrome && \
+    cp /usr/local/bin/navidrome /rootfs/usr/local/bin/navidrome && \
     cp /usr/local/bin/ffmpeg /rootfs/usr/bin/ffmpeg && \
     # Permissions
     chown -R 1000:1000 /rootfs/data /rootfs/music
