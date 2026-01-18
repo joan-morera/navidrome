@@ -1,7 +1,7 @@
 # Navidrome Build Versions
 
 # Main App
-navidrome-c5447a637a3a954f3e24ba0adc59e64ba9232742
+navidrome-c5447a637a3a954f3e24ba0adc59e64ba9232743
 ffmpeg-cc8f3921367f562850bc3cd5049eeff8427f6356
 
 # Libraries
