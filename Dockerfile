@@ -175,6 +175,7 @@ RUN echo "[BUILD] Building Navidrome (Commit: ${NAVIDROME_VERSION})..." && \
     export CGO_ENABLED=1 && \
     export CGO_LDFLAGS="-L/usr/local/lib -ltag -lz -lstdc++ -lm" && \
     export CGO_CFLAGS="-I/usr/local/include/taglib -I/usr/local/include" && \
+    export CGO_CFLAGS_ALLOW="--define-prefix" && \
     go build -tags=netgo -ldflags "-extldflags '-static' -X github.com/navidrome/navidrome/resources.Commit=$(git rev-parse HEAD) -X github.com/navidrome/navidrome/resources.Tag=0.0.0-HEAD" -o navidrome . && \
     cp navidrome /usr/local/bin/navidrome && \
     cd .. && rm -rf navidrome-src
