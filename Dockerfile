@@ -225,4 +225,4 @@ EXPOSE 4533
 
 USER navidrome
 
-ENTRYPOINT ["/navidrome"]
+ENTRYPOINT ["/usr/local/bin/navidrome"]
