@@ -32,9 +32,9 @@ ARG OPUS_VERSION
 ARG MP3LAME_VERSION
 ARG TAGLIB_VERSION
 
-# Optimization Flags (RPi4 / Cortex-A72)
-ARG CFLAGS="-O3 -mcpu=cortex-a72 -fstack-protector-strong -D_FORTIFY_SOURCE=2"
-ARG CXXFLAGS="-O3 -mcpu=cortex-a72 -fstack-protector-strong -D_FORTIFY_SOURCE=2"
+# Optimization Flags (Passed from Build System)
+ARG CFLAGS=""
+ARG CXXFLAGS=""
 ARG LDFLAGS="-Wl,-z,relro -Wl,-z,now"
 
 # PKG_CONFIG_PATH for /usr/local (libs built from source)
