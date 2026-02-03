@@ -2,7 +2,7 @@
 # Navidrome (RPi4 Optimized) - Bleeding Edge
 #
 # Stage 1: Builder
-FROM ogarcia/archlinux:latest AS builder
+FROM cachyos/cachyos-v3:latest AS builder
 
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
