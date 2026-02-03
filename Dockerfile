@@ -42,7 +42,7 @@ ARG CXXFLAGS=""
 ARG LDFLAGS="-Wl,-z,relro -Wl,-z,now"
 
 # PKG_CONFIG_PATH for /usr/local (libs built from source)
-ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:${PKG_CONFIG_PATH}"
+ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig"
 
 # Working Directory
 WORKDIR /build
@@ -50,6 +50,17 @@ WORKDIR /build
 # -----------------------------------------------------------------------------
 # 2. Build Dependencies (Audio Codecs)
 # -----------------------------------------------------------------------------
+
+# ZLIB (Static) - Needed for Navidrome/TagLib linkage
+# Using 1.3.1 (Latest Stable)
+RUN echo "[BUILD] Building Zlib..." && \
+    wget https://zlib.net/zlib-1.3.1.tar.gz && \
+    tar -xzf zlib-1.3.1.tar.gz && \
+    cd zlib-1.3.1 && \
+    ./configure --static --prefix=/usr/local && \
+    make -j$(nproc) && \
+    make install && \
+    cd .. && rm -rf zlib-1.3.1 zlib-1.3.1.tar.gz
 
 # LAME (MP3) - From Debian Salsa (Multimedia Team)
 RUN echo "[BUILD] Building Lame (Commit: ${MP3LAME_VERSION})..." && \
