@@ -57,6 +57,7 @@ RUN echo "[BUILD] Building Lame (Commit: ${MP3LAME_VERSION})..." && \
       --enable-static \
       --disable-shared \
       --enable-nasm \
+      --disable-decoder \
       && \
     make -j$(nproc) "CFLAGS=${CFLAGS}" && \
     make install && \
