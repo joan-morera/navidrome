@@ -1,10 +1,10 @@
 # Navidrome Build Versions
 
 # Main App
-navidrome-0c8f2a559c9b1c659fd78701d482ca1f34ff2f6d
-ffmpeg-a795ca89fa2f49f80cbe7a9fa323f278abf62e7f
+navidrome-408aa78ed53f0299d35e758cd422fd0b9dfe93a3
+ffmpeg-b8daba42cdb4b91e793b91ef3055797b0b7611bd
 
 # Libraries
-opus-475cbc5d0d13ac81d66f4ba884a7fa0702521b06
-mp3lame-745183b41aad50e36fd19b29dad2fc5b314668df
-taglib-74d93db16634cc647501e5eadfab96792e6a13d1
+opus-2d862ea14b233e5a3f3afaf74d96050691af3cd5
+mp3lame-dc89997277ae8a819a8fdefb388d1084cd8a8958
+taglib-f4117f873c2cdc7b61553ae27df34364340a37ea
