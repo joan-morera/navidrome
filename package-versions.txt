@@ -1,8 +1,8 @@
 # Navidrome Build Versions
 
 # Main App
-navidrome-c80ef8ae41d692f971baf2ebab1a710a3182108f
-ffmpeg-9bfa1635aef08e777deaeeae15ff9a5ade412188
+navidrome-f00af7f9837f23b7af9266a2d5fda6e060f67f14
+ffmpeg-61b1fb1d000fd812f56df618a7b577474e157aea
 
 # Libraries
 opus-2d862ea14b233e5a3f3afaf74d96050691af3cd5
