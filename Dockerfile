@@ -35,6 +35,7 @@ ARG FFMPEG_VERSION
 ARG OPUS_VERSION
 ARG MP3LAME_VERSION
 ARG TAGLIB_VERSION
+ARG ZLIB_VERSION
 
 # Optimization Flags (Passed from Build System)
 ARG CFLAGS=""
@@ -52,15 +53,15 @@ WORKDIR /build
 # -----------------------------------------------------------------------------
 
 # ZLIB (Static) - Needed for Navidrome/TagLib linkage
-# Using 1.3.1 (Latest Stable)
-RUN echo "[BUILD] Building Zlib..." && \
-    wget https://zlib.net/zlib-1.3.1.tar.gz && \
-    tar -xzf zlib-1.3.1.tar.gz && \
-    cd zlib-1.3.1 && \
+# Using ${ZLIB_VERSION} (Automatically tracked)
+RUN echo "[BUILD] Building Zlib (${ZLIB_VERSION})..." && \
+    wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz && \
+    tar -xzf zlib-${ZLIB_VERSION}.tar.gz && \
+    cd zlib-${ZLIB_VERSION} && \
     ./configure --static --prefix=/usr/local && \
     make -j$(nproc) && \
     make install && \
-    cd .. && rm -rf zlib-1.3.1 zlib-1.3.1.tar.gz
+    cd .. && rm -rf zlib-${ZLIB_VERSION} zlib-${ZLIB_VERSION}.tar.gz
 
 # LAME (MP3) - From Debian Salsa (Multimedia Team)
 RUN echo "[BUILD] Building Lame (Commit: ${MP3LAME_VERSION})..." && \

@@ -21,6 +21,7 @@ jobs:
       opus_ver: ${{ steps.get_opus.outputs.sha }}
       lame_ver: ${{ steps.get_lame.outputs.sha }}
       taglib_ver: ${{ steps.get_taglib.outputs.sha }}
+      zlib_ver: ${{ steps.get_zlib.outputs.ver }}
       
     steps:
       - uses: actions/checkout@v4
@@ -70,6 +71,14 @@ jobs:
            if [ -z "$SHA" ]; then echo "Failed to get TagLib SHA"; exit 1; fi
            echo "sha=${SHA}" >> $GITHUB_OUTPUT
 
+      # Zlib (Tags - madler/zlib)
+      - name: Get latest Zlib (Tag)
+        id: get_zlib
+        run: |
+           VER=$(git ls-remote --tags https://github.com/madler/zlib.git | grep -v "\^{}" | awk -F/ '{print $3}' | grep -E '^v[0-9.]+$' | sort -V | tail -n1 | sed 's/^v//')
+           if [ -z "$VER" ]; then echo "Failed to get Zlib version"; exit 1; fi
+           echo "ver=${VER}" >> $GITHUB_OUTPUT
+
 
       # -----------------------------------------------------------------------
       # 2. Compare with Stored
@@ -97,6 +106,7 @@ jobs:
             if check_ver "opus" "${{ steps.get_opus.outputs.sha }}"; then CHANGED=true; fi
             if check_ver "mp3lame" "${{ steps.get_lame.outputs.sha }}"; then CHANGED=true; fi
             if check_ver "taglib" "${{ steps.get_taglib.outputs.sha }}"; then CHANGED=true; fi
+            if check_ver "zlib" "${{ steps.get_zlib.outputs.ver }}"; then CHANGED=true; fi
 
             if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
                 CHANGED=true
@@ -137,6 +147,7 @@ jobs:
              OPUS_VERSION=${{ needs.check-versions.outputs.opus_ver }}
              MP3LAME_VERSION=${{ needs.check-versions.outputs.lame_ver }}
              TAGLIB_VERSION=${{ needs.check-versions.outputs.taglib_ver }}
+             ZLIB_VERSION=${{ needs.check-versions.outputs.zlib_ver }}
              CFLAGS=-O3 -mcpu=cortex-a72 -fstack-protector-strong -D_FORTIFY_SOURCE=2
              CXXFLAGS=-O3 -mcpu=cortex-a72 -fstack-protector-strong -D_FORTIFY_SOURCE=2
           platforms: linux/arm64
@@ -175,6 +186,7 @@ jobs:
              OPUS_VERSION=${{ needs.check-versions.outputs.opus_ver }}
              MP3LAME_VERSION=${{ needs.check-versions.outputs.lame_ver }}
              TAGLIB_VERSION=${{ needs.check-versions.outputs.taglib_ver }}
+             ZLIB_VERSION=${{ needs.check-versions.outputs.zlib_ver }}
              CFLAGS=-O3 -march=x86-64-v3 -fstack-protector-strong -D_FORTIFY_SOURCE=2
              CXXFLAGS=-O3 -march=x86-64-v3 -fstack-protector-strong -D_FORTIFY_SOURCE=2
           platforms: linux/amd64
@@ -205,6 +217,7 @@ jobs:
              echo "opus-${{ needs.check-versions.outputs.opus_ver }}" >> $FILE
              echo "mp3lame-${{ needs.check-versions.outputs.lame_ver }}" >> $FILE
              echo "taglib-${{ needs.check-versions.outputs.taglib_ver }}" >> $FILE
+             echo "zlib-${{ needs.check-versions.outputs.zlib_ver }}" >> $FILE
              
              git config --global user.name 'github-actions[bot]'
              git config --global user.email 'github-actions[bot]@users.noreply.github.com'
